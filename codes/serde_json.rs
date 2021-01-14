@@ -11,6 +11,9 @@ struct Foo {
     a: String,
 }
 
+#[derive(Serialize, Deserialize)]
+struct UnitLike;
+
 fn main() {
     let foo = Foo {
         a: r#""#.to_owned(),
@@ -29,4 +32,7 @@ line2"#
         serde_json::to_string(&foo).unwrap(),
         r#"{"a":"line1\nline2"}"#.to_owned()
     );
+
+    let ul = UnitLike;
+    dbg!(serde_json::to_string(&ul));
 }

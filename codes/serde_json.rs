@@ -13,6 +13,11 @@ struct Foo {
 
 #[derive(Serialize, Deserialize)]
 struct UnitLike;
+impl UnitLike {
+    pub fn new() -> Self {
+        Self
+    }
+}
 
 fn main() {
     let foo = Foo {
@@ -33,6 +38,6 @@ line2"#
         r#"{"a":"line1\nline2"}"#.to_owned()
     );
 
-    let ul = UnitLike;
+    let ul = UnitLike::new();
     dbg!(serde_json::to_string(&ul));
 }

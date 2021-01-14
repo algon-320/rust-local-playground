@@ -8,6 +8,7 @@ use std::net::TcpStream;
 
 fn main() {
     let mut stream = BufWriter::new(TcpStream::connect("127.0.0.1:34254").unwrap());
+    dbg!(stream.capacity());
     for i in 0..10 {
         stream.write(format!("hello {}\n", i).as_bytes()).unwrap();
         dbg!(stream.buffer().len());

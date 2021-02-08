@@ -1,25 +1,14 @@
 //# unicode-normalization = "0.1.8"
-//---- Put dependencies above ----
-
-#![allow(dead_code, unused_variables)]
 
 fn main() {
-    println!("Wellcome to the playground!");
-    let msg = "ヘ\u{3099}ストアルハ\u{3099}ム";
-    println!("{}", msg);
-    {
-        use unicode_normalization::UnicodeNormalization;
-        let msg_norm = msg.chars().nfc().collect::<String>();
-        println!("{}", msg_norm);
-    }
+    let s = "がか\u{3099}\u{00A0}\u{3099}";
+    println!("{}: {:?}", s, s);
+    let s = "ぞそ\u{3099}\u{00A0}\u{3099}";
+    println!("{}: {:?}", s, s);
+    let s = "に\u{3099}\u{00A0}\u{3099}";
+    println!("{}: {:?}", s, s);
 
-    let s = "が";
-    println!("{:?} ==> {:?}", s, s.as_bytes());
-    let s = "か\u{3099}";
-    println!("{:?} ==> {:?}", s, s.as_bytes());
-    let s = "か";
-    println!("{:?} ==> {:?}", s, s.as_bytes());
-
-    let c = unicode_normalization::char::compose('か', '\u{3099}');
-    println!("{:?}", c);
+    println!();
+    let c = unicode_normalization::char::compose('か', '\u{3099}').unwrap();
+    println!("{}: {:?}", c, c);
 }

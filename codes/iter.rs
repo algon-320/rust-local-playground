@@ -2,16 +2,31 @@
 
 #![allow(dead_code, unused_variables)]
 
-fn main() {
-    let v: Vec<Option<Vec<i32>>> = vec![Some(vec![1, 2, 3]), Some(vec![4, 5, 6])];
-    let w: Option<Vec<i32>> = v
-        .into_iter() /* ... */
-        .collect();
-    assert_eq!(w, Some(vec![1, 2, 3, 4, 5, 6]));
+use std::iter::Peekable;
+fn numeric<I>(itr: &mut Peekable<I>) -> Option<i64>
+where
+    I: Iterator<Item = char>,
+{
+    let mut tmp = None;
+    while let Some(d) = itr.peek().and_then(|c| c.to_digit(10)) {
+        itr.next().unwrap();
+        tmp = Some(tmp.unwrap_or(0i64) * 10 + d as i64);
+    }
+    tmp
+}
 
-    let v: Vec<Option<Vec<i32>>> = vec![None, Some(vec![4, 5, 6])];
-    let w: Option<Vec<i32>> = v
-        .into_iter() /* ... */
-        .collect();
-    assert_eq!(w, None);
+fn main() {
+    let s = "1;23;;";
+    let mut itr = s.chars().peekable();
+    let x = numeric(&mut itr);
+    assert_eq!(x, Some(1));
+    assert_eq!(itr.next(), Some(';'));
+    let x = numeric(&mut itr);
+    assert_eq!(x, Some(23));
+    assert_eq!(itr.next(), Some(';'));
+    let x = numeric(&mut itr);
+    assert_eq!(x, None);
+    assert_eq!(itr.next(), Some(';'));
+    let x = numeric(&mut itr);
+    assert_eq!(x, None);
 }

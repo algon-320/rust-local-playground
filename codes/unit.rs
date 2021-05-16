@@ -21,4 +21,3 @@ fn main() {
 //  let e = unit::E { e: () }; // error
     let e = unit::Ep { e: () };
 }
-

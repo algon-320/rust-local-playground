@@ -12,15 +12,21 @@ enum B {
 
 struct C;
 
-impl From<B> for A {
-    fn from(b: B) -> A {
-        A::B(b)
-    }
-}
+// impl From<B> for A {
+//     fn from(b: B) -> A {
+//         A::B(b)
+//     }
+// }
 
 impl From<C> for B {
     fn from(c: C) -> B {
         B::C(c)
+    }
+}
+
+impl<T: Into<B>> From<T> for A {
+    fn from(x: T) -> Self {
+        A::B(Into::<B>::into(x))
     }
 }
 

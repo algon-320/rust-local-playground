@@ -42,4 +42,11 @@ fn main() {
     let json = r#"{"c":[1,2,3,1,1,1,1]}"#;
     let s: Set = serde_json::from_str(json).unwrap();
     dbg!(s);
+
+    #[derive(Debug, Serialize, Deserialize)]
+    struct Foo {
+        x: i32,
+    }
+    let foo: Foo = serde_json::from_str(r#"{"x":123}"#).unwrap();
+    dbg!(foo);
 }

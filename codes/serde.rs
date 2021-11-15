@@ -1,6 +1,5 @@
 //# serde = { version = "1.0", features = ["derive"] }
 //# serde_json = "1.0"
-//# serde_yaml = "0.8"
 //---- Put dependencies above ----
 
 #![allow(dead_code, unused_variables)]
@@ -27,9 +26,6 @@ struct Set {
 }
 
 fn main() {
-    let x: u32 = serde_yaml::from_str("0xFFFFFFF").expect("de yaml");
-    dbg!(x);
-
     let h = Heavy("heavy".into());
     let f = FooRef {
         x: Cow::Borrowed(&h),

@@ -19,4 +19,7 @@ fn main() {
 
     let cmd = Command::Bar(-1, 23);
     println!("{}", serde_yaml::to_string(&cmd).unwrap());
+
+    let hex: u32 = serde_yaml::from_str("0xDEADBEEF").expect("yaml deserialize");
+    println!("hex = {} (0x{:08x} in hex)", hex, hex);
 }

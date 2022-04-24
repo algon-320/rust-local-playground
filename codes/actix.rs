@@ -484,7 +484,61 @@ mod mutual_ref {
     }
 }
 
+mod response_future {
+    use actix::prelude::*;
+    use tokio::sync::oneshot;
+
+    struct Act {
+        tx: Option<oneshot::Sender<()>>,
+    }
+    impl Actor for Act {
+        type Context = Context<Self>;
+    }
+
+    #[derive(Message)]
+    #[rtype(result = "()")]
+    struct Do;
+
+    impl Handler<Do> for Act {
+        type Result = actix::ResponseFuture<()>;
+        fn handle(&mut self, _: Do, _: &mut Self::Context) -> Self::Result {
+            println!("handling ..");
+            let tx = self.tx.take().unwrap();
+            Box::pin(async {
+                use std::time::Duration;
+                actix::clock::sleep(Duration::from_secs(3)).await;
+                println!("done!");
+                tx.send(()).unwrap();
+            })
+        }
+    }
+
+    pub async fn main() {
+        // send
+        {
+            let (tx, rx) = oneshot::channel::<()>();
+            let addr = Act { tx: Some(tx) }.start();
+
+            let fut = addr.send(Do).await.unwrap();
+
+            rx.await.unwrap();
+        }
+
+        // do_send
+        {
+            let (tx, rx) = oneshot::channel::<()>();
+            let addr = Act { tx: Some(tx) }.start();
+
+            // This call returns a (), but the response future is awaited internally
+            addr.do_send(Do);
+
+            // so, future rx should be resolved
+            rx.await.unwrap();
+        }
+    }
+}
+
 #[actix::main]
 async fn main() {
-    mutual_ref::main().await;
+    response_future::main().await;
 }

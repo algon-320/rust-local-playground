@@ -8,13 +8,18 @@ mod unit {
     pub struct C(());
     pub struct Cp(pub ());
     pub struct D {}
-    pub struct E { e: () }
-    pub struct Ep { pub e: () }
+    pub struct E {
+        e: (),
+    }
+    pub struct Ep {
+        pub e: (),
+    }
 }
 
 fn main() {
-    let a = unit::A;
-    let b = unit::B();
+    let a: unit::A = unit::A;
+    let b: unit::B = unit::B();
+    let b_ctor: fn() -> unit::B = unit::B;
 //  let c = unit::C(()); // error
     let c = unit::Cp(());
     let d = unit::D {};

@@ -15,12 +15,6 @@ impl T {
 
 fn imm_ref(r: &T) {}
 fn mut_ref(r: &mut T) {}
-fn imm_chain<'a>(r: &'a T) -> &'a T {
-    r
-}
-fn mut_chain<'a>(r: &'a mut T) -> &'a mut T {
-    r
-}
 fn consume_val(val: T) {}
 fn consume_box(ptr: Box<T>) {}
 fn consume_rc(ptr: Rc<T>) {}
@@ -60,26 +54,25 @@ fn stack() {
 
         let val3 = T;
 
-        let r1: &T = imm_chain(&val3); // r1 は val3 への参照
+        // immutableな参照は複数作ることができる
+        let r1: &T = &val3; // r1 は val3 への参照
+        let r2: &T = &val3; // r2 も val3 への参照
 
-        // immutableな参照は複数作ることができる (r1 と &val3)
-        imm_ref(&val3);
-
-        let r2: &T = imm_chain(r1); // r2 も val3 への参照
-        imm_ref(r2);
+        imm_ref(&r1);
+        imm_ref(&r2);
 
         // ---------------------------------
 
         let mut val4 = T;
 
-        let r1: &mut T = mut_chain(&mut val4);
+        let r1: &mut T = &mut val4;
 
         // - コンパイルエラー
         // - mutableな参照は複数作れない
-        // mut_ref(&mut val4); // &mut T として r1 が既に存在する
+        // let r2: &mut T = &mut val4;
+        // mut_ref(r2);
 
-        let r2: &mut T = mut_chain(r1);
-        mut_ref(r2);
+        mut_ref(r1);
     }
 
     // マルチスレッド
@@ -97,12 +90,12 @@ fn stack() {
         let val2 = T;
         std::thread::scope(|s| {
             // scopeは生成されたスレッドを自動的にjoinするため、
-            // 呼び出したスレッドのスタック上のデータを安全に参照できる。
+            // 呼び出したスレッドのスタック上のデータを安全に参照できる
             //
             // std::thread::spawn() はjoinするタイミングが自由な代わりに、
-            // 参照をキャプチャするには'staticのライフタイムが必要。
+            // 参照をキャプチャするには'staticのライフタイムが必要
             // (joinする前に関数を抜けるとスタックが破壊されてしまうため、
-            // スタック上のデータを参照できない。)
+            // スタック上のデータを参照できない)
 
             s.spawn(|| {
                 // メインスレッドのスタック上に置かれたval2への参照
@@ -127,25 +120,22 @@ fn heap() {
     // シングルスレッド
     {
         // - ヒープ上に置かれたTの値へのポインタ
-        // - Tをスタック上に構築した後にヒープ上にムーブされる
         // - ptr1 はポインタであり、Boxの値自体はスタック上にある
-        // - Box::clone()では新たにヒープを確保し、T::clone()で複製する
+        // - Rcと違い、Box::clone()では新たにヒープを確保しT::clone()で複製する
         let ptr1: Box<T> = Box::new(T);
 
         // - ヒープ上に置かれたTへの参照
         // - std::ops::Deref<Target = T>のおかげで&Box<T>から&Tを得られる
         imm_ref(&ptr1);
-        imm_ref(&*ptr1);
         ptr1.imm_method();
 
         // ---------------------------------
 
         let mut ptr2 = Box::new(T);
 
-        // - ヒープ上に置かれたTの借用
+        // - ヒープ上に置かれたTの可変参照
         // - std::ops::DerefMut のおかげで&mut Box<T>から&mut Tを得られる
         mut_ref(&mut ptr2);
-        mut_ref(&mut *ptr2);
         ptr2.mut_method();
 
         // ---------------------------------
@@ -153,8 +143,8 @@ fn heap() {
         let ptr3 = Box::new(T);
 
         // - ヒープ上に置かれたTをムーブ
-        // - *box_ptr は通常のderefとは異なる特別な操作 (deref move)
         // - ヒープメモリは開放され、スタックにTが移動する
+        // - *box_ptr は通常のderefとは異なる特別な操作 (deref move)
         consume_val(*ptr3);
 
         // ---------------------------------
@@ -169,10 +159,13 @@ fn heap() {
         // ---------------------------------
 
         // - ヒープ上に置かれたTの値へのポインタ
-        // - 参照カウントで管理される
+        // - 参照カウントで管理される (cloneで+1, dropで-1)
         // - cloneではポインタがコピーされるだけ (参照先は同じヒープ上のデータ)
+        // - カウントが0になるとメモリが解放される
         let ptr5: Rc<T> = Rc::new(T);
-        consume_rc(ptr5.clone()); // TはCloneを実装していないことに注意
+
+        // Rcをムーブ
+        consume_rc(ptr5.clone());
 
         // - ヒープ上に置かれたTへの参照
         // - std::ops::Deref<Target = T>のおかげで&Rc<T>から&Tを得られる
@@ -189,8 +182,8 @@ fn heap() {
 
         // - 参照カウントが1の場合にのみ Some(&mut T) を得ることができる
         // - 参照カウントが2以上ならNone
-        let r1: Option<&mut T> = Rc::get_mut(&mut ptr6);
-        mut_ref(r1.expect("ref-count is 1"));
+        let r: Option<&mut T> = Rc::get_mut(&mut ptr6);
+        mut_ref(r.expect("ref-count is 1"));
 
         // ---------------------------------
 
@@ -200,13 +193,12 @@ fn heap() {
         // - Rcと異なりSendが実装されるため、別のスレッドに渡して共有できる
         let mut ptr7: Arc<T> = Arc::new(T);
 
-        // - シングルスレッド環境ではRcと同じように使うことができる
-        // - atomicなカウンタを用いる分だけオーバーヘッドが発生する可能性がある
+        // - 基本的な操作はRcと同じ
         consume_arc(ptr7.clone());
         imm_ref(&ptr7);
         ptr7.imm_method();
-        let r1: Option<&mut T> = Arc::get_mut(&mut ptr7);
-        mut_ref(r1.expect("ref-count is 1"));
+        let r: Option<&mut T> = Arc::get_mut(&mut ptr7);
+        mut_ref(r.expect("ref-count is 1"));
     }
 
     // マルチスレッド
@@ -224,20 +216,10 @@ fn heap() {
             imm_ref(&ptr2);
         });
 
-        // ヒープ上のTへの参照 (別のスレッドと共有している)
-        imm_ref(&ptr1);
-
-        // ---------------------------------
-
-        let ptr3 = Box::new(T);
-        std::thread::scope(|s| {
-            s.spawn(|| {
-                // メインスレッドのスタックに置かれたptr3が指すヒープ上のTへの参照
-                imm_ref(&ptr3);
-            });
-        });
-        // ヒープ上のTへの参照 (別のスレッドは既にjoinされているため共有されていない)
-        imm_ref(&ptr3);
+        {
+            // ヒープ上のTへの参照 (別のスレッドと共有している)
+            imm_ref(&ptr1);
+        }
     }
 }
 
@@ -268,15 +250,13 @@ fn static_data() {
         impl !Sync for U {}
 
         // コンパイルエラー (Sync が必要)
-        // static XXXX: X = X;
+        // static VALUE: U = U;
 
         // ---------------------------------
 
         // - 静的領域に置かれたTの値
         // - static mutで定義された値へのアクセスはunsafe
-        // - Rustのルールを侵害する可能性があるためunsafe
-        //   1. &T は複数存在できるが、&mut T と共存できない
-        //   2. &mut T は同時に2つ以上存在してはならない
+        // - unsafeなので普通は使わない
         static mut MUT_VAL: T = T;
 
         // 静的領域に置かれたTへの参照 (&'static T)
@@ -299,7 +279,6 @@ fn static_data() {
 
         // 外部クレート lazy_static
         // - 動的に初期化できる
-        // - 内部的には static mut な値を生成して初回アクセス時に初期化する
         lazy_static::lazy_static! {
             static ref LAZY_VAL: T = {
                 compute()
@@ -311,7 +290,8 @@ fn static_data() {
         LAZY_VAL.imm_method();
 
         // - コンパイルエラー
-        // - lazy_static の static ref で定義された値から &mut T を作ることはできない
+        // - lazy_static で定義された値から &mut T を作ることはできない
+        // - 可変性が欲しい場合はMutexを使う
         // mut_ref(&mut LAZY_VAL);
         // LAZY_VAL.mut_method();
     }
@@ -353,12 +333,13 @@ fn interior_mutability() {
     use std::cell::RefCell;
 
     // - スタック上のRefCell<T>
-    // - 任意の型Tに対して使える
+    // - Cellと異なり、Copyでない型でも使える
+    // - 実行時に参照のチェックが行われる
     let val2: RefCell<T> = RefCell::new(T);
 
-    // - RefCellの内部のデータ(スタック上)への参照
-    // - RefCell内部への可変参照が既に存在する場合にはパニックする
     {
+        // - RefCellの内部のデータ(スタック上)への参照
+        // - RefCell内部への可変参照(RefMut)が既に存在する場合にはパニックする
         let r1: std::cell::Ref<'_, T> = val2.borrow();
 
         // Refは複数あってもOK
@@ -371,17 +352,17 @@ fn interior_mutability() {
         r2.imm_method();
     }
 
-    // - RefCellの内部のデータへの可変参照
-    // - RefCell内部への別の可変参照が既に存在する場合にはパニックする
     {
+        // - RefCellの内部のデータへの可変参照
+        // - 他のRefMutやRefが存在する場合にはパニックする
         let mut r3: std::cell::RefMut<'_, T> = val2.borrow_mut();
+
+        mut_ref(&mut r3);
+        r3.mut_method();
 
         // パニック
         // let r4: std::cell::Ref<'_, T> = val2.borrow();
         // let r5: std::cell::RefMut<'_, T> = val2.borrow_mut();
-
-        mut_ref(&mut r3);
-        r3.mut_method();
     }
 
     // ---------------------------------
@@ -404,7 +385,7 @@ fn interior_mutability() {
     assert_eq!(1_u8, val3.load(Ordering::SeqCst));
 
     // - Atomic系の型はSync を実装しているため、スレッド間で共有できる
-    // - std::thread::spawnは&'staticを要求するため、Arcと組み合わせて使うことが多い
+    // - 参照で共有しようとすると&'staticが必要になるため、Arcと組み合わせて使うことが多い
     let ptr1 = Arc::new(AtomicU8::new(0_u8));
     let ptr2 = ptr1.clone();
     std::thread::spawn(move || {
@@ -421,9 +402,8 @@ fn interior_mutability() {
     use std::sync::Mutex;
 
     // - スタック上のMutex<T>
-    // - 任意の型Tに対して使える
+    // - 整数型以外の一般的な型を共有するときにはMutexを用いる
     // - マルチスレッドで排他的にTを操作するために用いる
-    // - シングルスレッドで使うメリットはない
     let val4: Mutex<T> = Mutex::new(T);
 
     {
@@ -445,13 +425,15 @@ fn interior_mutability() {
         guard.mut_method();
     }
 
+    // ---------------------------------
+
     // - MutexはSyncを実装しているため、スレッド間でデータを共有するために用いることができる
-    // - std::thread::spawnは&'staticを要求するため、Arcと組み合わせて使うことが多い
+    // - 参照で共有しようとすると&'staticが必要になるため、Arcと組み合わせて使うことが多い
     let ptr1: Arc<Mutex<T>> = Arc::new(Mutex::new(T));
 
     let ptr2 = ptr1.clone();
     std::thread::spawn(move || {
-        // 他のスレッドがロックを保持している場合は、解放するまで待つ
+        // 他のスレッドがロックを保持している場合は、解放されるまで待つ
         let mut guard = ptr2.lock().unwrap();
 
         // - Mutex内部への可変参照
@@ -478,5 +460,6 @@ fn main() {
     stack();
     heap();
     static_data();
+
     interior_mutability();
 }
